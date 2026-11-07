@@ -1,0 +1,16 @@
+# macOS
+.DS_Store
+
+# Node.js dependencies
+node_modules/
+
+# Compiled TypeScript output
+dist/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Local SpacetimeDB configuration
+spacetime.local.json
