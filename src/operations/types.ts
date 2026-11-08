@@ -69,6 +69,7 @@ export interface Responder {
   id: string
   name: string
   readiness: 'Available' | 'Unavailable'
+  coordinates?: Position
 }
 
 export interface Assignment {

@@ -215,7 +215,7 @@ export const coordinateBrowserRequest = spacetimedb.reducer(
     if (status === 'Assigned') {
       if (
         !teamId ||
-        !['alpha', 'bravo', 'charlie', 'delta', 'foxtrot'].includes(teamId)
+        !['A', 'B', 'C', 'D', 'F'].includes(teamId)
       ) {
         throw new SenderError('Choose an available response team.');
       }

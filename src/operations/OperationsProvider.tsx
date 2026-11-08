@@ -74,9 +74,13 @@ export function OperationsProvider({ children }: { children: ReactNode }) {
     }
     if (pending.current) return
     const before = incidentById(state, action.incidentId)?.request.Status
-    const after = incidentById(operationsReducer(state, action), action.incidentId)?.request.Status
+    const nextState = operationsReducer(state, action)
+    const after = incidentById(nextState, action.incidentId)?.request.Status
     if (before && after && before !== after) {
-      void save(connection => connection.setStatus(action.incidentId, before, after, action.type === 'assign' ? action.teamId : undefined))
+      const teamId = action.type === 'assign'
+        ? nextState.assignments.find(item => item.incidentId === action.incidentId)?.teamId
+        : undefined
+      void save(connection => connection.setStatus(action.incidentId, before, after, teamId))
     } else {
       apply(action)
     }

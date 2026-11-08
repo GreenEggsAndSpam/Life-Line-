@@ -1,11 +1,17 @@
 import { ArrowDown, ArrowRight, ArrowUp, Search } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Empty, PageTitle, PanelHeader, StatusBadge } from '../../components/ui'
+import { Badge, Empty, PageTitle, PanelHeader, StatusBadge } from '../../components/ui'
 import { useOperations } from '../../operations/OperationsContext'
 import { teams } from '../../operations/demo'
 import { formatTime, matchesIncident, primaryReport } from '../../operations/incidents'
 import { canAssign } from '../../operations/store'
-import { categories, incidentStatuses } from '../../operations/types'
+import { categories, incidentStatuses, type Urgency } from '../../operations/types'
+
+const urgencyTones: Record<Urgency, string> = {
+  Critical: 'red',
+  Elevated: 'orange',
+  Routine: 'yellow',
+}
 
 export default function IncidentsPage() {
   const { state, alerts } = useOperations()
@@ -49,14 +55,16 @@ export default function IncidentsPage() {
         <div className="table-scroll" tabIndex={0} role="region" aria-label="Incident register table">
           <table><thead><tr><th scope="col">Incident ID</th><th scope="col">Report</th><th scope="col">Location</th>
             <th scope="col" aria-sort={oldest ? 'ascending' : 'descending'}><button className="table-sort" onClick={() => filter('sort', oldest ? '' : 'oldest')}>Reported {oldest ? <ArrowUp size={13} /> : <ArrowDown size={13} />}</button></th>
-            <th scope="col">Status</th><th scope="col">Responder</th></tr></thead>
+            <th scope="col">Urgency</th><th scope="col">Status</th><th scope="col">Responder</th></tr></thead>
             <tbody>{filtered.map(incident => {
               const report = primaryReport(incident)
               const teamId = state.assignments.find(item => item.incidentId === incident.request.Id)?.teamId
               return <tr key={incident.request.Id}>
                 <td><Link className="table-id mono" to={`/incidents/${incident.request.Id}`}>{incident.request.Id} <ArrowRight size={13} /></Link></td>
                 <td className="table-description"><strong>{incident.title}</strong><span>{incident.request.EmergencyType} · {report.affected} affected</span></td><td>{report.location}</td>
-                <td className="nowrap">{formatTime(Date.parse(incident.request.Time))} PT</td><td><StatusBadge status={incident.request.Status} /></td>
+                <td className="nowrap">{formatTime(Date.parse(incident.request.Time))} PT</td>
+                <td><Badge tone={urgencyTones[incident.request.Urgency]}>{incident.request.Urgency}</Badge></td>
+                <td><StatusBadge status={incident.request.Status} /></td>
                 <td>{teams.find(team => team.id === teamId)?.name ?? '—'}</td>
               </tr>
             })}</tbody>

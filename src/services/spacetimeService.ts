@@ -2,6 +2,7 @@ import { DbConnection, tables } from '../module_bindings'
 import type { MyRescueRequest } from '../module_bindings/types'
 import { assistanceOptions, categories, incidentStatuses, type Assignment, type Incident, type IncidentActivity, type IncidentStatus, type ReportDraft } from '../operations/types'
 import { analyzeIncident, emergencyTypeFor } from '../operations/assessment'
+import { currentTeamId } from '../operations/dispatch'
 
 export interface RequestSnapshot {
   incidents: Incident[]
@@ -48,7 +49,7 @@ export function requestSnapshot(rows: Iterable<MyRescueRequest>): RequestSnapsho
 
     const Status = statusFor(row.status)
     if (row.teamId && assignedAt !== undefined && Status !== 'Verified Closed') {
-      assignments.push({ incidentId: Id, teamId: row.teamId, assignedAt })
+      assignments.push({ incidentId: Id, teamId: currentTeamId(row.teamId), assignedAt })
     }
     incidents.push({
       request: {
