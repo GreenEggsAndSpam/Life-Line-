@@ -53,6 +53,25 @@ After changing the module schema, regenerate the checked-in client bindings:
 spacetime generate --lang typescript --module-path spacetimedb/spacetimedb --out-dir src/module_bindings
 ```
 
+## Run the optional Gemini analyzer
+
+In a second terminal, from the repository root:
+
+```sh
+cd ai-analyzer
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+```
+
+Set `GEMINI_API_KEY` in `ai-analyzer/.env`, then start the analyzer:
+
+```sh
+python -m uvicorn main:app --host 127.0.0.1 --port 8001
+```
+
+Run the frontend on port 5173. In **Incidents**, click **Analyze with Gemini AI** to send the fictional incident descriptions for assessment. The **Urgency** column shows Gemini's suggestion alongside the saved urgency. The suggestions last for the current visit to the page.
+
 ## Request data
 
 The frontend stores each incident's API-shaped data in `incident.request`.
@@ -70,7 +89,7 @@ The frontend stores each incident's API-shaped data in `incident.request`.
 }
 ```
 
-`Time` is the submission timestamp in UTC. Both coordinates are `null` when the location cannot be mapped. `EmergencyType` uses the incident category, and `Urgency` is `Critical`, `Elevated`, or `Routine`. New demo reports start as `Routine` and `Reported`. Reporter details and incident activity stay outside the payload.
+`Time` is the submission timestamp in UTC. Both coordinates are `null` when the location cannot be mapped. `EmergencyType` uses the incident category, and `Urgency` is `Critical`, `Elevated`, or `Routine`. New reports start as `Reported`, with urgency based on the type of assistance and the number of people affected. Reporter details and incident activity stay outside the payload.
 
 ## Checks
 
