@@ -16,6 +16,7 @@ const spacetimedb = schema({
       ...requestFields,
       created_at: t.timestamp(),
       status: t.string(),
+
     }
   ),
   rescueRequestDetails: table(
@@ -34,6 +35,9 @@ const spacetimedb = schema({
       acknowledgedAt: t.timestamp().optional(),
       deliveredAt: t.timestamp().optional(),
       verifiedAt: t.timestamp().optional(),
+
+
+
     }
   ),
 });
@@ -119,24 +123,56 @@ export const createRescueRequest = spacetimedb.reducer(requestFields, (ctx, fiel
   insertRequest(ctx, fields, { submissionId: '', hasCoordinates: true, location: '', affected: 0, assistance: 'Other' });
 });
 
+
 export const submitBrowserRequest = spacetimedb.reducer(
-  { ...requestFields, submissionId: t.string(), hasCoordinates: t.bool(), location: t.string(), affected: t.u16(), assistance: t.string() },
+  {
+    ...requestFields,
+    submissionId: t.string(),
+    hasCoordinates: t.bool(),
+    location: t.string(),
+    affected: t.u16(),
+    assistance: t.string(),
+  },
   (ctx, { submissionId, hasCoordinates, location, affected, assistance, ...fields }) => {
-    if (submissionId.length !== 36 || location.trim().length < 3 || location.length > 160
-        || fields.description.trim().length < 12 || fields.description.length > 1000
-        || affected < 1 || affected > 9999
-        || !['Rescue', 'Medical Assistance', 'Evacuation', 'Food and Water', 'Shelter', 'Other'].includes(assistance)) {
+    if (
+      submissionId.length !== 36 ||
+      location.trim().length < 3 ||
+      location.length > 160 ||
+      fields.description.trim().length < 12 ||
+      fields.description.length > 1000 ||
+      affected < 1 ||
+      affected > 9999 ||
+      !['Rescue', 'Medical Assistance', 'Evacuation', 'Food and Water', 'Shelter', 'Other'].includes(assistance)
+    ) {
       throw new SenderError('Invalid demo request.');
     }
-    if ([...ctx.db.rescueRequestDetails.owner.filter(ctx.sender)].some(row => row.submissionId === submissionId)) return;
-    insertRequest(ctx, fields, { submissionId, hasCoordinates, location, affected, assistance });
+
+    if (
+      [...ctx.db.rescueRequestDetails.owner.filter(ctx.sender)].some(
+        row => row.submissionId === submissionId
+      )
+    ) {
+      return;
+    }
+
+    insertRequest(ctx, fields, {
+      submissionId,
+      hasCoordinates,
+      location,
+      affected,
+      assistance,
+    });
   }
 );
 
 function ownedRequest(ctx: Context, id: bigint) {
   const request = ctx.db.rescueRequest.id.find(id);
   const details = ctx.db.rescueRequestDetails.requestId.find(id);
-  if (!request || !details?.owner.equals(ctx.sender)) throw new SenderError('Request not found.');
+
+  if (!request || !details?.owner.equals(ctx.sender)) {
+    throw new SenderError('Request not found.');
+  }
+
   return { request, details };
 }
 
@@ -158,29 +194,63 @@ const transitions: Record<string, string[]> = {
 };
 
 export const coordinateBrowserRequest = spacetimedb.reducer(
-  { id: t.u64(), expectedStatus: t.string(), status: t.string(), teamId: t.string().optional() },
+  {
+    id: t.u64(),
+    expectedStatus: t.string(),
+    status: t.string(),
+    teamId: t.string().optional(),
+  },
   (ctx, { id, expectedStatus, status, teamId }) => {
     const { request, details } = ownedRequest(ctx, id);
-    if (request.status !== expectedStatus || !transitions[request.status]?.includes(status)) {
-      throw new SenderError('The request status changed. Review it and try again.');
+
+    if (
+      request.status !== expectedStatus ||
+      !transitions[request.status]?.includes(status)
+    ) {
+      throw new SenderError(
+        'The request status changed. Review it and try again.'
+      );
     }
+
     if (status === 'Assigned') {
-      if (!teamId || !['alpha', 'bravo', 'charlie', 'delta', 'foxtrot'].includes(teamId)) {
+      if (
+        !teamId ||
+        !['alpha', 'bravo', 'charlie', 'delta', 'foxtrot'].includes(teamId)
+      ) {
         throw new SenderError('Choose an available response team.');
       }
-      if ([...ctx.db.rescueRequestDetails.owner.filter(ctx.sender)].some(row => row.teamId === teamId)) {
+
+      if (
+        [...ctx.db.rescueRequestDetails.owner.filter(ctx.sender)].some(
+          row => row.teamId === teamId
+        )
+      ) {
         throw new SenderError('That team already has an assignment.');
       }
     }
-    ctx.db.rescueRequest.id.update({ ...request, status });
+
+    ctx.db.rescueRequest.id.update({
+      ...request,
+      status,
+    });
+
     ctx.db.rescueRequestDetails.requestId.update({
       ...details,
-      teamId: status === 'Verified Closed' ? undefined : status === 'Assigned' ? teamId : details.teamId,
+      teamId:
+        status === 'Verified Closed'
+          ? undefined
+          : status === 'Assigned'
+            ? teamId
+            : details.teamId,
       acknowledgedAt: details.acknowledgedAt ?? ctx.timestamp,
-      assignedAt: status === 'Assigned' ? ctx.timestamp : details.assignedAt,
-      startedAt: status === 'In Progress' ? ctx.timestamp : details.startedAt,
-      deliveredAt: status === 'Assistance Delivered' ? ctx.timestamp : details.deliveredAt,
-      verifiedAt: status === 'Verified Closed' ? ctx.timestamp : details.verifiedAt,
+      assignedAt:
+        status === 'Assigned' ? ctx.timestamp : details.assignedAt,
+      startedAt:
+        status === 'In Progress' ? ctx.timestamp : details.startedAt,
+      deliveredAt:
+        status === 'Assistance Delivered' ? ctx.timestamp : details.deliveredAt,
+      verifiedAt:
+        status === 'Verified Closed' ? ctx.timestamp : details.verifiedAt,
     });
   }
 );
