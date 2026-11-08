@@ -1,7 +1,7 @@
 import { DbConnection, tables } from '../module_bindings'
 import type { MyRescueRequest } from '../module_bindings/types'
 import { assistanceOptions, categories, incidentStatuses, type Assignment, type Incident, type IncidentActivity, type IncidentStatus, type ReportDraft } from '../operations/types'
-import { analyzeIncident, emergencyTypeFor } from '../operations/assessment'
+import { analyzeIncident, calculateUrgency, emergencyTypeFor } from '../operations/assessment'
 
 export interface RequestSnapshot {
   incidents: Incident[]
@@ -137,7 +137,7 @@ export function connectRequests(
         latitude: draft.coordinates?.[0] ?? 0,
         longitude: draft.coordinates?.[1] ?? 0,
         hasCoordinates: draft.coordinates !== null,
-        urgency: 'Routine',
+        urgency: calculateUrgency(draft),
         location: draft.location,
         affected: draft.affected,
         assistance: draft.assistance,
