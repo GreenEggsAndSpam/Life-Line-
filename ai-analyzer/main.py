@@ -23,7 +23,7 @@ def prioritize(request: PrioritizeRequest):
     ]
 
     return prioritize_incidents(incidents)
-app.app_middleware(
+app.add_middleware(
     CORSMiddleware,
     allow_origins = [
         "http://localhost:5173",
