@@ -1,26 +1,31 @@
 import { Check, Flag, Users } from 'lucide-react'
 import { useState } from 'react'
 import { useOperations } from '../../operations/OperationsContext'
-import { availableTeams, canAssign } from '../../operations/store'
+import { primaryReport } from '../../operations/incidents'
+import { availableTeams, canAssign, nearestAvailableTeam } from '../../operations/store'
 import type { Incident } from '../../operations/types'
 
 function AssignmentControl({ incident }: { incident: Incident }) {
-  const { state, dispatch, saving } = useOperations()
-  const [selected, setSelected] = useState('')
-  const available = availableTeams(state)
+  const { state, dispatch, saving, backend } = useOperations()
   if (!canAssign(incident)) return null
-  return <form className="assignment-form" onSubmit={event => {
-    event.preventDefault()
-    if (available.some(team => team.id === selected)) {
-      dispatch({ type: 'assign', incidentId: incident.request.Id, teamId: selected })
-      setSelected('')
-    }
-  }}>
-    <label>Assign responder<select value={available.some(team => team.id === selected) ? selected : ''} onChange={event => setSelected(event.target.value)} disabled={!available.length}>
-      <option value="">{available.length ? 'Select an available team' : 'No available teams'}</option>{available.map(team => <option key={team.id} value={team.id}>{team.name}</option>)}
-    </select></label>
-    <button type="submit" className="button" disabled={saving || !available.some(team => team.id === selected)}><Users size={15} /> Assign Responder</button>
-  </form>
+
+  const incidentId = incident.request.Id
+  if (backend !== 'demo' && !primaryReport(incident).coordinates) {
+    return <p className="muted">Dispatch requires coordinates on the saved incident.</p>
+  }
+  const nearest = nearestAvailableTeam(state, incident)
+  if (nearest) return <div className="stack">
+    <p>Nearest available team: <strong>{nearest.team.name}</strong> · {nearest.distanceKm.toFixed(1)} km straight-line distance</p>
+    <div className="action-row">
+      <button type="button" className="button" disabled={saving} onClick={() => dispatch({ type: 'assign', incidentId, teamId: nearest.team.id })}>
+        <Users size={15} /> Dispatch nearest team
+      </button>
+    </div>
+  </div>
+
+  return <p className="muted">{availableTeams(state).length
+    ? 'Dispatch requires valid incident coordinates.'
+    : 'No response teams are currently available.'}</p>
 }
 
 export function IncidentActions({ incident }: { incident: Incident }) {

@@ -3,13 +3,21 @@ import { useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { PageTitle, SafetyNotice } from '../components/ui'
 import { useOperations } from '../operations/OperationsContext'
-import { areas } from '../operations/demo'
-import { coordinatesFor, reportErrors } from '../operations/incidents'
+import { areas, REGION } from '../operations/demo'
+import { reportErrors } from '../operations/incidents'
 import { assistanceOptions, type ReportDraft } from '../operations/types'
+
+type FormErrors = ReturnType<typeof reportErrors> & Partial<Record<'neighborhood' | 'latitude' | 'longitude', string>>
+
+function parseCoordinate(value: string, limit: number) {
+  if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(value)) return null
+  const coordinate = Number(value)
+  return Math.abs(coordinate) <= limit ? coordinate : null
+}
 
 export default function ReportEmergencyPage() {
   const { state, submitReport, backend, saving } = useOperations()
-  const [errors, setErrors] = useState<ReturnType<typeof reportErrors>>({})
+  const [errors, setErrors] = useState<FormErrors>({})
   const [submitted, setSubmitted] = useState(false)
   const submittedId = submitted && state.latestPublicReportId
   const formRef = useRef<HTMLFormElement>(null)
@@ -19,12 +27,29 @@ export default function ReportEmergencyPage() {
     const values = new FormData(event.currentTarget)
     const get = (key: string) => String(values.get(key) ?? '').trim()
     const assistance = assistanceOptions.find(value => value === get('assistance'))
-    const location = get('location')
+    const neighborhood = areas.find(area => area.name === get('neighborhood'))
+    const latitudeText = get('latitude')
+    const longitudeText = get('longitude')
+    const usesCoordinates = latitudeText !== '' || longitudeText !== ''
+    const latitude = parseCoordinate(latitudeText, 90)
+    const longitude = parseCoordinate(longitudeText, 180)
+    const exactPosition: ReportDraft['coordinates'] = latitude !== null && longitude !== null ? [latitude, longitude] : null
+    const address = get('location')
+    const location = exactPosition
+      ? address || exactPosition.join(', ')
+      : [address, neighborhood?.name, REGION].filter(Boolean).join(', ')
     const draft: ReportDraft = {
-      location, coordinates: coordinatesFor(location), description: get('description'), affected: Number(get('affected')),
+      location, coordinates: usesCoordinates ? exactPosition : neighborhood?.position ?? null,
+      description: get('description'), affected: Number(get('affected')),
       assistance: assistance ?? 'Other', reporterType: 'Civilian', reporterName: get('name') || undefined, contact: get('contact') || undefined,
     }
-    const validation = reportErrors(draft)
+    const validation: FormErrors = reportErrors(draft)
+    if (usesCoordinates) {
+      if (latitude === null) validation.latitude = 'Enter a latitude between −90 and 90.'
+      if (longitude === null) validation.longitude = 'Enter a longitude between −180 and 180.'
+    } else if (!neighborhood) {
+      validation.neighborhood = 'Choose a neighborhood or enter both coordinates.'
+    }
     if (!assistance) validation.assistance = 'Choose the type of assistance needed.'
     setErrors(validation)
     const firstError = Object.keys(validation)[0]
@@ -49,14 +74,34 @@ export default function ReportEmergencyPage() {
     <div className="narrow-stack">
       <SafetyNotice />
       {submittedId ? <section className="panel submission-success" role="status">
-        <CheckCircle2 size={36} /><h2>Demo report recorded</h2><p>Your reference is <strong className="mono">{submittedId}</strong>. The incident is visible in this workspace.</p>
-        <div className="action-row"><button className="button" onClick={() => setSubmitted(false)}>Submit another report</button><Link className="button primary" to={`/incidents?q=${submittedId}`}>Find report <ArrowRight size={15} /></Link></div>
+        <CheckCircle2 size={36} /><h2>Demo report recorded</h2><p>Your reference is <strong className="mono">{submittedId}</strong>.</p>
+        <div className="action-row">
+          <Link className="button primary" to={`/?report=${encodeURIComponent(submittedId)}`}><MapPin size={15} /> Show on map</Link>
+          <Link className="button" to={`/incidents?q=${encodeURIComponent(submittedId)}`}>Find report <ArrowRight size={15} /></Link>
+          <button type="button" className="button" onClick={() => setSubmitted(false)}>Submit another report</button>
+        </div>
       </section> : <section className="panel">
         <form className="form-body" ref={formRef} onSubmit={submit} noValidate>
           <div className="form-grid">
-            <label className="full-field">Location or address <span className="required">*</span><input name="location" list="demo-areas" placeholder="e.g. Capitol Hill, Seattle" required maxLength={160} {...validationProps('location')} />{error('location')}
-              <datalist id="demo-areas">{areas.map(area => <option key={area.name} value={`${area.name}, Seattle, WA`} />)}</datalist>
-              <span className="field-hint"><MapPin size={13} /> Choose a listed Seattle neighborhood to place the incident on the map.</span>
+            <p className="full-field field-hint"><MapPin size={13} /> Enter both coordinates for an exact pin, or choose a neighborhood for an approximate pin.</p>
+            <label>Latitude
+              <input name="latitude" inputMode="decimal" placeholder="e.g. 47.6241" {...validationProps('latitude')} />
+              {error('latitude')}
+            </label>
+            <label>Longitude
+              <input name="longitude" inputMode="decimal" placeholder="e.g. -122.3157" {...validationProps('longitude')} />
+              {error('longitude')}
+            </label>
+            <label>Seattle neighborhood
+              <select name="neighborhood" defaultValue="" {...validationProps('neighborhood')}>
+                <option value="">Select a neighborhood</option>
+                {areas.map(area => <option key={area.name}>{area.name}</option>)}
+              </select>
+              {error('neighborhood')}
+            </label>
+            <label>Street address or landmark <small>Optional</small>
+              <input name="location" maxLength={120} placeholder="e.g. Near the community center" {...validationProps('location')} />
+              {error('location')}
             </label>
             <label>Type of assistance <span className="required">*</span><select name="assistance" defaultValue="" required {...validationProps('assistance')}><option value="" disabled>Select assistance</option>{assistanceOptions.map(item => <option key={item}>{item}</option>)}</select>{error('assistance')}</label>
             <label>People affected <span className="required">*</span><input name="affected" type="number" inputMode="numeric" min={1} max={9999} placeholder="e.g. 4" required {...validationProps('affected')} />{error('affected')}</label>

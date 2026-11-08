@@ -77,6 +77,8 @@ button:disabled, select:disabled { cursor: not-allowed; opacity: .55; }
 .tone-green { --tone: #8ce8ad; --tint: #20372d; }
 .tone-amber { --tone: #f2c67d; --tint: #3a3020; }
 .tone-red { --tone: #ff9a9e; --tint: #3b262e; }
+.tone-orange { --tone: #ffad76; --tint: #3d2a20; }
+.tone-yellow { --tone: #f6dc78; --tint: #39331e; }
 .tone-blue { --tone: #9cc6fd; --tint: #22344b; }
 .tone-violet { --tone: #cdb7fa; --tint: #322a43; }
 .tone-neutral { --tone: #cfdae3; --tint: #273541; }
@@ -106,6 +108,7 @@ button:disabled, select:disabled { cursor: not-allowed; opacity: .55; }
 .map-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 9px 12px; border-top: 1px solid var(--border); color: var(--muted); font-size: 11px; }
 .map-legend > span { display: inline-flex; align-items: center; gap: 5px; }
 .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--tone); }
+.map-pin-station { border-radius: 20%; }
 .map-loading { min-height: 340px; display: grid; place-items: center; color: var(--muted); }
 .incident-map .leaflet-popup-content-wrapper, .incident-map .leaflet-popup-tip { background: #192735; color: #edf3f7; }
 .incident-map .leaflet-popup-content { margin: 13px 17px; }
