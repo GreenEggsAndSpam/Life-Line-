@@ -19,9 +19,9 @@ Open the local URL printed by Vite. On subsequent runs, `npm run dev` is enough.
 - **Incidents** supports search, filters, assignment, status updates, duplicate review, and coordinator verification.
 - **Follow-up** lists reports that need acknowledgment, assignment, verification, or review.
 - **Responders** lets you select a demo team and record observations or progress on its assignment.
-- **Report an incident** adds a fictional report to the local workspace. Choose a listed Seattle neighborhood to place it on the map.
+- **Report an incident** accepts latitude and longitude for an exact pin or a Seattle neighborhood for an approximate pin. After submitting, select **Show on map** to open the new report.
 
-The default demo runs in memory and resets on reload. An optional SpacetimeDB mode stores reports and coordination status. The map uses online street tiles, subject to the [OpenStreetMap tile usage policy](https://operations.osmfoundation.org/policies/tiles/). Reports outside the listed demo areas stay in the incident list.
+The default demo runs in memory and resets on reload. An optional SpacetimeDB mode stores reports and coordination status. The map uses online street tiles, subject to the [OpenStreetMap tile usage policy](https://operations.osmfoundation.org/policies/tiles/). Older reports without coordinates stay in the incident list.
 
 ## Connect to local SpacetimeDB
 
