@@ -19,9 +19,9 @@ Open the local URL printed by Vite. On subsequent runs, `npm run dev` is enough.
 - **Incidents** supports search, filters, assignment, status updates, duplicate review, and coordinator verification.
 - **Follow-up** lists reports that need acknowledgment, assignment, verification, or review.
 - **Responders** lets you select a demo team and record observations or progress on its assignment.
-- **Report an incident** adds a fictional report to the local workspace. Choose a listed Seattle neighborhood to place it on the map.
+- **Report an incident** accepts latitude and longitude for an exact pin or a Seattle neighborhood for an approximate pin. After submitting, select **Show on map** to open the new report.
 
-The default demo runs in memory and resets on reload. An optional SpacetimeDB mode stores reports and coordination status. The map uses online street tiles, subject to the [OpenStreetMap tile usage policy](https://operations.osmfoundation.org/policies/tiles/). Reports outside the listed demo areas stay in the incident list.
+The default demo runs in memory and resets on reload. An optional SpacetimeDB mode stores reports and coordination status. The map uses online street tiles, subject to the [OpenStreetMap tile usage policy](https://operations.osmfoundation.org/policies/tiles/). Older reports without coordinates stay in the incident list.
 
 ## Connect to local SpacetimeDB
 
@@ -53,6 +53,25 @@ After changing the module schema, regenerate the checked-in client bindings:
 spacetime generate --lang typescript --module-path spacetimedb/spacetimedb --out-dir src/module_bindings
 ```
 
+## Run the optional Gemini analyzer
+
+In a second terminal, from the repository root:
+
+```sh
+cd ai-analyzer
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+```
+
+Set `GEMINI_API_KEY` in `ai-analyzer/.env`, then start the analyzer:
+
+```sh
+python -m uvicorn main:app --host 127.0.0.1 --port 8001
+```
+
+Run the frontend on port 5173. In **Incidents**, click **Analyze with Gemini AI** to send the fictional incident descriptions for assessment. The **Urgency** column shows Gemini's suggestion alongside the saved urgency. The suggestions last for the current visit to the page.
+
 ## Request data
 
 The frontend stores each incident's API-shaped data in `incident.request`.
@@ -70,7 +89,7 @@ The frontend stores each incident's API-shaped data in `incident.request`.
 }
 ```
 
-`Time` is the submission timestamp in UTC. Both coordinates are `null` when the location cannot be mapped. `EmergencyType` uses the incident category, and `Urgency` is `Critical`, `Elevated`, or `Routine`. New demo reports start as `Routine` and `Reported`. Reporter details and incident activity stay outside the payload.
+`Time` is the submission timestamp in UTC. Both coordinates are `null` when the location cannot be mapped. `EmergencyType` uses the incident category, and `Urgency` is `Critical`, `Elevated`, or `Routine`. New reports start as `Reported`, with urgency based on the type of assistance and the number of people affected. Reporter details and incident activity stay outside the payload.
 
 ## Checks
 

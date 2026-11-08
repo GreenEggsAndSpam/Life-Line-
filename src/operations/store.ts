@@ -1,7 +1,8 @@
 import { areas, MINUTE, REGION, seedReports, teams } from './demo'
 import type { Assignment, Category, Incident, IncidentActivity, IncidentStatus, ReportDraft, Urgency } from './types'
-import { analyzeIncident, emergencyTypeFor } from './assessment'
+import { analyzeIncident, calculateUrgency, emergencyTypeFor } from './assessment'
 import { nextStatus, possibleDuplicates, reportErrors } from './incidents'
+import { closestAvailableTeam } from './dispatch'
 
 export interface OperationsState {
   now: number
@@ -15,7 +16,7 @@ export interface OperationsState {
 export type Action =
   | { type: 'report'; draft: ReportDraft }
   | { type: 'acknowledge' | 'flag'; incidentId: string }
-  | { type: 'assign'; incidentId: string; teamId: string }
+  | { type: 'assign'; incidentId: string; teamId?: string }
   | { type: 'progress'; incidentId: string; teamId?: string }
   | { type: 'verify'; incidentId: string }
   | { type: 'observation'; incidentId: string; teamId: string; note: string }
@@ -31,7 +32,7 @@ function createIncident(
   at: number,
   draft: ReportDraft,
   category: Category = emergencyTypeFor(draft.assistance),
-  urgency: Urgency = 'Routine',
+  urgency: Urgency = calculateUrgency(draft),
   status: IncidentStatus = 'Reported',
 ): Incident {
   return {
@@ -64,37 +65,44 @@ function withActivity(incident: Incident, at: number, actor: string, label: stri
 
 export function createDemoState(now = Date.now()): OperationsState {
   const assignments: Assignment[] = []
-  const incidents = seedReports.map((seed, index) => {
+  const incidents: Incident[] = []
+  const busyTeamIds = new Set<string>()
+  for (let index = seedReports.length - 1; index >= 0; index--) {
+    const seed = seedReports[index]
     const at = now - seed.age * MINUTE
     const area = areas[seed.area]
+    const needsTeam = seed.status === 'Assigned' || seed.status === 'In Progress' || seed.status === 'Assistance Delivered'
+    const nearest = needsTeam ? closestAvailableTeam(area.position, busyTeamIds) : undefined
+    const status = needsTeam && !nearest ? 'Under Review' : seed.status
     let incident = {
       ...createIncident(1048 - index, at, {
         description: seed.description, location: `${area.name}, ${REGION}`, coordinates: area.position,
         affected: seed.affected, assistance: seed.assistance,
         reporterType: index % 3 === 0 ? 'Witness' : index % 3 === 1 ? 'Civilian' : 'Responder',
-      }, seed.category, seed.priority, seed.status),
+      }, seed.category, seed.priority, status),
       title: seed.title,
       flagged: !!seed.flagged,
     }
-    if (seed.status !== 'Reported') {
+    if (status !== 'Reported') {
       incident = withActivity({ ...incident, acknowledgedAt: at + MINUTE }, at + MINUTE, 'Coordinator', 'Incident acknowledged')
     }
-    if (seed.team) {
-      assignments.push({ teamId: seed.team, incidentId: incident.request.Id, assignedAt: at + 3 * MINUTE })
-      incident = withActivity(incident, at + 3 * MINUTE, 'Coordinator', `${teams.find(team => team.id === seed.team)?.name} assigned`)
+    if (nearest) {
+      busyTeamIds.add(nearest.team.id)
+      assignments.push({ teamId: nearest.team.id, incidentId: incident.request.Id, assignedAt: at + 3 * MINUTE })
+      incident = withActivity(incident, at + 3 * MINUTE, 'Coordinator', `${nearest.team.name} assigned`)
     }
-    if (['In Progress', 'Assistance Delivered', 'Verified Closed'].includes(seed.status)) {
+    if (['In Progress', 'Assistance Delivered', 'Verified Closed'].includes(status)) {
       incident = withActivity(incident, at + 5 * MINUTE, 'Field team', 'Response in progress')
     }
-    if (seed.status === 'Assistance Delivered' || seed.status === 'Verified Closed') {
+    if (status === 'Assistance Delivered' || status === 'Verified Closed') {
       incident = withActivity({ ...incident, deliveredAt: at + 12 * MINUTE }, at + 12 * MINUTE, 'Field team', 'Assistance marked delivered')
     }
-    if (seed.status === 'Verified Closed') {
+    if (status === 'Verified Closed') {
       incident = withActivity({ ...incident, verifiedAt: at + 20 * MINUTE }, at + 20 * MINUTE, 'Coordinator', 'Resolution verified and incident closed')
     }
-    return incident
-  })
-  return { ...createEmptyState(now), incidents, assignments }
+    incidents.push(incident)
+  }
+  return { ...createEmptyState(now), incidents: incidents.reverse(), assignments }
 }
 
 export function createEmptyState(now = Date.now()): OperationsState {
@@ -121,6 +129,12 @@ export function availableTeams(state: OperationsState) {
   return teams.filter(team => teamStatus(state, team.id) === 'Available')
 }
 
+export function nearestAvailableTeam(state: OperationsState, incident: Incident) {
+  const { Latitude, Longitude } = incident.request
+  const position = Latitude === null || Longitude === null ? null : [Latitude, Longitude] as const
+  return closestAvailableTeam(position, new Set(state.assignments.map(assignment => assignment.teamId)))
+}
+
 function replaceIncident(state: OperationsState, incident: Incident): OperationsState {
   return { ...state, incidents: state.incidents.map(item => item.request.Id === incident.request.Id ? incident : item) }
 }
@@ -140,8 +154,9 @@ function applyIncidentAction(state: OperationsState, action: Extract<Action, { i
     case 'flag':
       return update({ flagged: !incident.flagged }, incident.flagged ? 'Review flag cleared' : 'Flagged for coordinator review')
     case 'assign': {
-      const team = availableTeams(state).find(item => item.id === action.teamId)
-      if (!team || !canAssign(incident) || state.assignments.some(item => item.incidentId === id)) return state
+      if (!canAssign(incident) || state.assignments.some(item => item.incidentId === id)) return state
+      const team = nearestAvailableTeam(state, incident)?.team
+      if (!team || (action.teamId !== undefined && action.teamId !== team.id)) return state
       const acknowledged = incident.acknowledgedAt === undefined
         ? withActivity({ ...incident, acknowledgedAt: state.now }, state.now, 'Coordinator', 'Incident acknowledged during assignment')
         : incident

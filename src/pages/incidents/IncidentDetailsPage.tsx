@@ -68,18 +68,6 @@ export default function IncidentDetailsPage() {
             </article>)}
           </div>
         </section>
-        <details className="panel disclosure">
-          <summary>Demo assessment</summary>
-          <div className="panel-body stack">
-            <Notice tone="blue"><strong>AI interpretation</strong><p>These interpretations and suggestions are synthetic and require coordinator review.</p></Notice>
-            <dl className="data-grid">
-              <div><dt>Analysis status</dt><dd>{incident.analysis.status}</dd></div><div><dt>Incident category</dt><dd>{incident.request.EmergencyType}</dd></div>
-              <div><dt>Assistance requirements</dt><dd>{incident.analysis.requirements}</dd></div><div><dt>Reported safety concerns</dt><dd>{incident.analysis.safety}</dd></div>
-              <div><dt>Potential mobility concerns</dt><dd>{incident.analysis.mobility}</dd></div><div><dt>Potential duplicates</dt><dd>{duplicates.length ? `${duplicates.length} possible match${duplicates.length === 1 ? '' : 'es'}` : 'No open matches'}</dd></div>
-            </dl>
-            <div><h3>Suggested actions</h3><ul className="suggestions">{incident.analysis.suggestions.map(suggestion => <li key={suggestion}>{suggestion}</li>)}</ul></div>
-          </div>
-        </details>
         {duplicates.length > 0 && <section className="panel" id="duplicates" ref={duplicateSection} tabIndex={-1}>
           <PanelHeader title="Duplicate Review" subtitle="Compare original reports before combining records" />
           <div className="panel-body stack">{duplicates.map(candidate => <DuplicateReview key={candidate.request.Id} incident={incident} candidate={candidate} />)}</div>

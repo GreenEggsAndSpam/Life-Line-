@@ -1,6 +1,6 @@
 import { ArrowRight } from 'lucide-react'
 import { lazy, Suspense } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Empty, PageTitle, PanelHeader, StatusBadge } from '../../components/ui'
 import { useOperations } from '../../operations/OperationsContext'
 import { primaryReport } from '../../operations/incidents'
@@ -9,6 +9,8 @@ const IncidentMap = lazy(() => import('./IncidentMap'))
 
 export default function OverviewPage() {
   const { state, alerts } = useOperations()
+  const [searchParams] = useSearchParams()
+  const reportId = searchParams.get('report')
   const { incidents } = state
   const active = incidents.filter(incident => incident.request.Status !== 'Verified Closed').length
   const followUps = new Set(alerts.map(alert => alert.incidentId)).size
@@ -22,7 +24,7 @@ export default function OverviewPage() {
       <Link to="/nobody-forgotten"><strong>{followUps}</strong> Need follow-up</Link>
     </div>
     <Suspense fallback={<section className="panel map-loading" role="status">Loading map…</section>}>
-      <IncidentMap incidents={incidents} />
+      <IncidentMap key={reportId} incidents={incidents} focusReportId={reportId} />
     </Suspense>
     <section className="panel recent-panel">
       <PanelHeader title="Recent incidents" action={<Link to="/incidents" className="text-link">View all <ArrowRight size={14} /></Link>} />

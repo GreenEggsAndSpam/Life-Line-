@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { defaultThresholds, MINUTE } from '../src/operations/demo'
 import { coordinatesFor, getEscalations, mapStatus, possibleDuplicates, reportErrors } from '../src/operations/incidents'
-import { createDemoState, incidentById, operationsReducer, teamStatus } from '../src/operations/store'
+import { createDemoState, createEmptyState, incidentById, operationsReducer, teamStatus } from '../src/operations/store'
 import type { ReportDraft } from '../src/operations/types'
 
 const draft: ReportDraft = {
@@ -38,24 +38,44 @@ test('public report validation and shared ID creation preserve the original repo
 
 test('assignment is exclusive and only a coordinator can verify after delivery', () => {
   const seed = createDemoState()
+  assert.equal(seed.assignments.find(assignment => assignment.incidentId === 'RP-1046')?.teamId, 'D')
   const incidentId = 'RP-1047'
   assert.equal(operationsReducer(seed, { type: 'verify', incidentId }), seed)
-  assert.equal(operationsReducer(seed, { type: 'assign', incidentId, teamId: 'alpha' }), seed)
-  assert.equal(operationsReducer(seed, { type: 'assign', incidentId, teamId: 'echo' }), seed)
-  const assigned = operationsReducer(seed, { type: 'assign', incidentId, teamId: 'foxtrot' })
-  assert.equal(teamStatus(assigned, 'foxtrot'), 'Assigned')
-  assert.equal(operationsReducer(assigned, { type: 'assign', incidentId: 'RP-1048', teamId: 'foxtrot' }), assigned)
-  assert.equal(operationsReducer(assigned, { type: 'progress', incidentId, teamId: 'bravo' }), assigned)
+  assert.equal(operationsReducer(seed, { type: 'assign', incidentId, teamId: 'A' }), seed)
+  assert.equal(operationsReducer(seed, { type: 'assign', incidentId, teamId: 'E' }), seed)
+  const assigned = operationsReducer(seed, { type: 'assign', incidentId, teamId: 'B' })
+  assert.equal(teamStatus(assigned, 'B'), 'Assigned')
+  assert.equal(operationsReducer(assigned, { type: 'assign', incidentId: 'RP-1048', teamId: 'B' }), assigned)
+  assert.equal(operationsReducer(assigned, { type: 'progress', incidentId, teamId: 'A' }), assigned)
   assert.equal(operationsReducer(assigned, { type: 'verify', incidentId }), assigned)
-  const started = operationsReducer(assigned, { type: 'progress', incidentId, teamId: 'foxtrot' })
-  const observed = operationsReducer(started, { type: 'observation', incidentId, teamId: 'foxtrot', note: 'Access from the west entrance.' })
+  const started = operationsReducer(assigned, { type: 'progress', incidentId, teamId: 'B' })
+  const observed = operationsReducer(started, { type: 'observation', incidentId, teamId: 'B', note: 'Access from the west entrance.' })
   assert.match(incidentById(observed, incidentId)!.activity.at(-1)!.label, /Access from the west/)
-  const delivered = operationsReducer(observed, { type: 'progress', incidentId, teamId: 'foxtrot' })
+  const delivered = operationsReducer(observed, { type: 'progress', incidentId, teamId: 'B' })
   assert.equal(incidentById(delivered, incidentId)?.request.Status, 'Assistance Delivered')
-  assert.equal(operationsReducer(delivered, { type: 'progress', incidentId, teamId: 'foxtrot' }), delivered)
+  assert.equal(operationsReducer(delivered, { type: 'progress', incidentId, teamId: 'B' }), delivered)
   const closed = operationsReducer(delivered, { type: 'verify', incidentId })
   assert.equal(incidentById(closed, incidentId)?.request.Status, 'Verified Closed')
-  assert.equal(teamStatus(closed, 'foxtrot'), 'Available')
+  assert.equal(teamStatus(closed, 'B'), 'Available')
+})
+
+test('nearest dispatch skips unavailable and already assigned teams', () => {
+  const report: ReportDraft = { ...draft, location: 'Madison Valley, Seattle, WA', coordinates: [47.6257, -122.2918] }
+  const first = operationsReducer(createEmptyState(), { type: 'report', draft: report })
+  const firstId = first.incidents[0].request.Id
+  const assigned = operationsReducer(first, { type: 'assign', incidentId: firstId })
+  assert.equal(assigned.assignments[0]?.teamId, 'C') // Team E is at these coordinates but is unavailable.
+  assert.equal(incidentById(assigned, firstId)?.request.Status, 'Assigned')
+  assert.equal(operationsReducer(assigned, { type: 'assign', incidentId: firstId }), assigned)
+
+  const second = operationsReducer(assigned, { type: 'report', draft: report })
+  const next = operationsReducer(second, { type: 'assign', incidentId: second.incidents[0].request.Id })
+  assert.deepEqual(next.assignments.map(assignment => assignment.teamId), ['C', 'B'])
+
+  const unmapped = operationsReducer(next, { type: 'report', draft: { ...report, coordinates: null } })
+  const unmappedId = unmapped.incidents[0].request.Id
+  assert.equal(operationsReducer(unmapped, { type: 'assign', incidentId: unmappedId }), unmapped)
+  assert.equal(operationsReducer(unmapped, { type: 'assign', incidentId: unmappedId, teamId: 'A' }), unmapped)
 })
 
 test('acknowledgment clears only acknowledgment alerts, and wait thresholds use demo time', () => {

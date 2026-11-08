@@ -12,26 +12,26 @@ const assistanceCategories: Record<Assistance, Category> = {
 export function emergencyTypeFor(assistance: Assistance): Category {
   return assistanceCategories[assistance]
 }
+
 export function calculateUrgency(report: ReportDraft): Urgency {
   let score = 0
-  if (report.assistance === "Rescue"){
-    score +=40
-  } else if (report.assistance === "Medical Assistance"){
-    score +=35
-  } else if (report.assistance === "Evacuation"){
-    score +=25
+  if (report.assistance === 'Rescue') {
+    score += 40
+  } else if (report.assistance === 'Medical Assistance') {
+    score += 35
+  } else if (report.assistance === 'Evacuation') {
+    score += 25
   }
-  if (report.affected >=6) {
-    score +=20
-  } 
-  if (report.affected >=20) {
-    score +=15
+  if (report.affected >= 6) {
+    score += 20
+  }
+  if (report.affected >= 20) {
+    score += 15
   }
   if (score >= 60) return 'Critical'
   if (score >= 30) return 'Elevated'
   return 'Routine'
 }
-
 function suggestResponseActions(category: Category): string[] {
   const checks: Record<Category, string> = {
     Flooding: 'Confirm water depth and an accessible approach with a field team.',
@@ -53,4 +53,3 @@ export function analyzeIncident(report: ReportDraft, category: Category): AIAnal
     suggestions: suggestResponseActions(category),
   }
 }
-

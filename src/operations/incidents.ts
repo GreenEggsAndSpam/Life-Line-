@@ -1,5 +1,8 @@
 import { areas, MINUTE } from './demo'
 import type { EscalationAlert, Incident, IncidentStatus, ReportDraft, Thresholds } from './types'
+import { haversineDistanceKm } from './dispatch'
+
+export { haversineDistanceKm }
 
 export const primaryReport = (incident: Incident) => incident.reports[0]
 
@@ -35,7 +38,7 @@ function reportsOverlap(left: Incident, right: Incident) {
     const sentence = (value: string) => value.toLowerCase().split(/[.!?]/, 1)[0].trim()
     if (sentence(a.description) !== sentence(b.description)) return false
     if (a.coordinates && b.coordinates) {
-      return Math.hypot((a.coordinates[0] - b.coordinates[0]) * 111, (a.coordinates[1] - b.coordinates[1]) * 75) < 2.5
+      if (a.coordinates && b.coordinates) { return haversineDistanceKm(a.coordinates, b.coordinates) < 2.5}
     }
     return a.location.toLowerCase() === b.location.toLowerCase()
   }))

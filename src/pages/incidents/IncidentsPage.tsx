@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ArrowDown, ArrowRight, ArrowUp, Search } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Empty, PageTitle, PanelHeader, StatusBadge } from '../../components/ui'
+import { Badge, Empty, PageTitle, PanelHeader, StatusBadge } from '../../components/ui'
 import { useOperations } from '../../operations/OperationsContext'
 import { teams } from '../../operations/demo'
 import { formatTime, matchesIncident, primaryReport } from '../../operations/incidents'
@@ -27,7 +27,6 @@ export default function IncidentsPage() {
   const escalation = params.get('escalation') ?? ''
   const oldest = params.get('sort') === 'oldest'
   const active = alerts.map(alert => alert.incidentId)
-
   const filtered = state.incidents.filter(incident => {
     const assigned = state.assignments.some(
       item => item.incidentId === incident.request.Id
@@ -57,7 +56,7 @@ export default function IncidentsPage() {
     setAiResults([])
 
     try {
-      const incidents = state.incidents.map(incident => ({
+      const results = await prioritizeIncidents(state.incidents.map(incident => ({
         id: incident.request.Id,
         description: incident.reports
           .map(report => report.description)

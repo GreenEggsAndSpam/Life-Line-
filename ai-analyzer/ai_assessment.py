@@ -118,5 +118,3 @@ if __name__ == "__main__":
     result = prioritize_incidents(incidents)
 
     print(result.model_dump_json(indent=2))
-    
-
