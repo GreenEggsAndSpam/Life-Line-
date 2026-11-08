@@ -15,3 +15,7 @@ dist/
 # Local SpacetimeDB configuration
 spacetime.local.json
 
+# Python AI analyzer
+/ai-analyzer/.venv/
+/ai-analyzer/.env
+__pycache__/

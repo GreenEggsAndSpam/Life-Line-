@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { ArrowDown, ArrowRight, ArrowUp, Search } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Badge, Empty, PageTitle, PanelHeader, StatusBadge } from '../../components/ui'
@@ -6,6 +7,7 @@ import { teams } from '../../operations/demo'
 import { formatTime, matchesIncident, primaryReport } from '../../operations/incidents'
 import { canAssign } from '../../operations/store'
 import { categories, incidentStatuses, type Urgency } from '../../operations/types'
+import { prioritizeIncidents, type AIResult } from '../../services/aiService'
 
 const urgencyTones: Record<Urgency, string> = {
   Critical: 'red',
@@ -15,6 +17,9 @@ const urgencyTones: Record<Urgency, string> = {
 
 export default function IncidentsPage() {
   const { state, alerts } = useOperations()
+  const [analyzing, setAnalyzing] = useState(false)
+  const [aiError, setAiError] = useState('')
+  const [assessments, setAssessments] = useState<Map<string, AIResult>>(new Map())
   const [params, setParams] = useSearchParams()
   const search = params.get('q') ?? ''
   const category = params.get('category') ?? ''
@@ -39,10 +44,32 @@ export default function IncidentsPage() {
     setParams(next, { replace: true, preventScrollReset: true })
   }
 
+  async function analyzeIncidents() {
+    if (analyzing || !state.incidents.length) return
+    setAnalyzing(true)
+    setAiError('')
+    try {
+      const results = await prioritizeIncidents(state.incidents.map(incident => ({
+        id: incident.request.Id,
+        description: incident.reports.map(report => report.description).join('\n'),
+      })))
+      setAssessments(new Map(results.map(result => [result.id, result])))
+    } catch {
+      setAiError('Gemini assessment could not be completed. Check that the AI analyzer is running and try again.')
+    } finally {
+      setAnalyzing(false)
+    }
+  }
+
   return <>
     <PageTitle title="Incidents" />
     <section className="panel">
-      <PanelHeader title={`${filtered.length} of ${state.incidents.length} incidents`} />
+      <PanelHeader title={`${filtered.length} of ${state.incidents.length} incidents`} action={
+        <button type="button" className="button" onClick={analyzeIncidents} disabled={analyzing || !state.incidents.length}>
+          {analyzing ? 'Analyzing incidents…' : 'Analyze with Gemini AI'}
+        </button>
+      } />
+      {aiError && <p className="panel-body" role="alert">{aiError}</p>}
       <div className="filter-bar">
         <label className="input-with-icon"><Search size={16} /><input value={search} onChange={event => filter('q', event.target.value)} placeholder="Search ID, description, or location…" aria-label="Search incident register" /></label>
         <select value={category} onChange={event => filter('category', event.target.value)} aria-label="Category filter"><option value="">All categories</option>{categories.map(value => <option key={value}>{value}</option>)}</select>
@@ -59,11 +86,21 @@ export default function IncidentsPage() {
             <tbody>{filtered.map(incident => {
               const report = primaryReport(incident)
               const teamId = state.assignments.find(item => item.incidentId === incident.request.Id)?.teamId
+              const assessment = assessments.get(incident.request.Id)
               return <tr key={incident.request.Id}>
                 <td><Link className="table-id mono" to={`/incidents/${incident.request.Id}`}>{incident.request.Id} <ArrowRight size={13} /></Link></td>
                 <td className="table-description"><strong>{incident.title}</strong><span>{incident.request.EmergencyType} · {report.affected} affected</span></td><td>{report.location}</td>
                 <td className="nowrap">{formatTime(Date.parse(incident.request.Time))} PT</td>
-                <td><Badge tone={urgencyTones[incident.request.Urgency]}>{incident.request.Urgency}</Badge></td>
+                <td>
+                  <Badge tone={urgencyTones[incident.request.Urgency]}>{incident.request.Urgency}</Badge>
+                  {assessment && <details>
+                    <summary>Gemini suggests {assessment.urgency}</summary>
+                    <p>{assessment.summary}</p>
+                    <p>{assessment.reason}</p>
+                    <p>{assessment.request_type}{assessment.immediate_review && ' · Immediate review suggested'}</p>
+                    {assessment.missing_info.length > 0 && <p>Missing information: {assessment.missing_info.join(', ')}</p>}
+                  </details>}
+                </td>
                 <td><StatusBadge status={incident.request.Status} /></td>
                 <td>{teams.find(team => team.id === teamId)?.name ?? '—'}</td>
               </tr>

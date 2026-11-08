@@ -1,6 +1,6 @@
 import { areas, MINUTE, REGION, seedReports, teams } from './demo'
 import type { Assignment, Category, Incident, IncidentActivity, IncidentStatus, ReportDraft, Urgency } from './types'
-import { analyzeIncident, emergencyTypeFor } from './assessment'
+import { analyzeIncident, calculateUrgency, emergencyTypeFor } from './assessment'
 import { nextStatus, possibleDuplicates, reportErrors } from './incidents'
 import { closestAvailableTeam } from './dispatch'
 
@@ -32,7 +32,7 @@ function createIncident(
   at: number,
   draft: ReportDraft,
   category: Category = emergencyTypeFor(draft.assistance),
-  urgency: Urgency = 'Routine',
+  urgency: Urgency = calculateUrgency(draft),
   status: IncidentStatus = 'Reported',
 ): Incident {
   return {
